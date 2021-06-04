@@ -130,7 +130,9 @@ class MainListener:
         # I also call it on startup to load existing devices from the DB.
 
         LOGGER.info("Device is ready: new=%s, device=%s NwkId: %s IEEE: %s signature=%s", new, device, device.nwk, device._ieee, device.get_signature())   
-        if new and device.nwk != 0x0000 and len( device.get_signature()) > 0:     
+        if new and device.nwk != 0x0000 and len( device.get_signature()) > 0:   
+            Domoticz.Log("Calling domoCreateDevice")
+            device_signature = device.get_signature()
             domoCreateDevice( self, device._ieee, device.get_signature() )
 
         for ep_id, endpoint in device.endpoints.items():
@@ -169,9 +171,15 @@ class MainListener:
 
 async def main( self ):
 
+    logging.basicConfig(level=logging.DEBUG)  
     import zigpy.config as conf
     # Make sure that we have the quirks embedded.
-    import zhaquirks  # noqa: F401
+    try:
+        import zhaquirks  # noqa: F401
+        Domoticz.Log( "Module zhaquirks loaded")
+    except:
+        Domoticz.Error( "Module zhaquirks not loaded")
+
 
     Domoticz.Log("Entering in main ....")
     if self.domoticzParameters["Mode2"] in ( 'USB', 'DIN'):
@@ -276,7 +284,7 @@ class BasePlugin:
                 Domoticz.Error("zigpy_thread - Error on asyncio.run: %s" %e)
 
     def onStart(self):
-        logging.basicConfig(level=logging.DEBUG)
+        logging.basicConfig(level=logging.INFO)
         self.domoticzParameters = dict(Parameters)
         DumpConfigToLog()
         self.domoticzDevices = Devices
@@ -308,7 +316,8 @@ class BasePlugin:
         Domoticz.Log("onDisconnect called")
 
     def onHeartbeat(self):
-        Domoticz.Log("onHeartbeat called")
+        #Domoticz.Log("onHeartbeat called")
+        pass
 
 def domoMajDevice( self, device_ieee, cluster, attribute_id, value ):
 
@@ -387,12 +396,21 @@ def UpdateDevice(self, Unit, nValue, sValue ):
 
 def domoCreateDevice( self, device_ieee, device_signature):
 
-    Domoticz.Debug("device_signature: %s" %device_signature)
-    for ep in device_signature:
+    Domoticz.Log("device_signature: %s" %device_signature)
+    if 'model' in device_signature:
+        Domoticz.Log(" - Model: %s" %device_signature['model'])
+
+    if 'node_desc' in device_signature:
+        Domoticz.Log(" - Node Desciptor: %s" %device_signature['node_desc'])
+
+    if 'endpoints' in device_signature:
+        device_signature_endpoint = device_signature[ 'endpoints']
+
+    for ep in device_signature_endpoint:
         
         Domoticz.Debug(" --> ep: %s" %ep)
-        in_cluster = device_signature[ep]['in_clusters']
-        out_cluster = device_signature[ep]['out_clusters']
+        in_cluster = device_signature_endpoint[ep]['input_clusters']
+        out_cluster = device_signature_endpoint[ep]['output_clusters']
         for cluster in set(in_cluster+out_cluster):
             Domoticz.Debug("----> Cluster: %s" %cluster)
             widget_type = get_type_from_cluster( cluster )
@@ -412,6 +430,21 @@ def domoCreateDevice( self, device_ieee, device_signature):
             elif widget_type == 'Motion':
                 Domoticz.Debug("----> Create Motion")
                 createDomoticzWidget( self, device_ieee, ep, widget_type, widgetType='Motion')
+
+            elif widget_type == 'Temp':
+                createDomoticzWidget( self, device_ieee, ep, widget_type, widgetType="Temperature")
+
+            elif widget_type == 'Humi':
+                createDomoticzWidget( self, device_ieee, ep, widget_type, widgetType="Humidity")
+
+            elif widget_type == 'Baro':
+                createDomoticzWidget( self, device_ieee, ep, widget_type, widgetType="Barometer")
+
+            elif widget_type == 'Venetian':
+                createDomoticzWidget( self, device_ieee, ep, widget_type, Type_ = 244, Subtype_ = 73, Switchtype_ = 15 )
+
+            elif widget_type == 'LvlControl':
+                createDomoticzWidget( self, Devices, NWKID, DeviceID_IEEE, Ep, t, Type_ = 244, Subtype_ = 73, Switchtype_ = 7 )
  
 def createDomoticzWidget( self, ieee, ep, cType, widgetType = None,
                          Type_ = None, Subtype_ = None, Switchtype_ = None ): 
@@ -452,7 +485,12 @@ def get_type_from_cluster( cluster ):
 
     TYPE_LIST = {
         0x0006:'Switch',
+        0x0008:'LvlControl',
+        0x0102:'Shutter',
         0x0400:'Lux',
+        0x0402:'Temp',
+        0x0403:'Baro',
+        0x0405:'Humi',
         0x0406:'Motion'
     }
     if cluster not in TYPE_LIST:
