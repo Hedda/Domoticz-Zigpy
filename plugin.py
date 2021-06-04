@@ -80,7 +80,9 @@
 </plugin>
 """
 
-
+import sys
+sys.path.append('/usr/lib/python3.9/site-packages')
+sys.path.append('/var/lib/domoticz/plugins/Domoticz-Zigpy')
 import Domoticz
 import asyncio
 import threading
@@ -171,6 +173,7 @@ async def main( self ):
     # Make sure that we have the quirks embedded.
     import zhaquirks  # noqa: F401
 
+    Domoticz.Log("Entering in main ....")
     if self.domoticzParameters["Mode2"] in ( 'USB', 'DIN'):
         path = self.domoticzParameters["SerialPort"]
     elif self.domoticzParameters["Mode2"] == 'PI':
