@@ -1,6 +1,6 @@
 # Zigpy plugin for Domoticz
 
-UNFORTUNATLY THIS PROJECT IS CLOSE, DUE TO THE FACT THAT THE ZIGPY LIBRARY IS NOT COMPATIBLE WITH DOMOTICZ (OR VICE-VERSA).
+With the recent change done in Domoticz, the issue arround SQLITE3 is now solved.
 
 ## Introduction
 
@@ -16,16 +16,11 @@ The zigpy Github Organization is located at https://github.com/zigpy/. There are
 
 This project at this early stage is more a developers-only POC (Proof-Of-Concept) than anything else, as such users should not expect anything with it to work as of yet.
 
-Due to a bug ( https://github.com/domoticz/domoticz/issues/4312 ) this plugin does not currently work at all with a standard Domoticz binary file.
-This means that in order to be able to test this plugin the Domoicz application must at this time first be recompiled and linked with disabling the use of "BUILTIN_SQLITE".
-To do that, edit the file CMakeList.txt and disable the "Use of builtin sqlite library" in order to link with the standard SQLITE3 library.
-`option(USE_BUILTIN_SQLITE "Use builtin sqlite library" NO)`
 
 ## Current showstoppers
 
 For now there are a number of show stoppers that need to be solved/sorted/fixed or have a more acceptable workaround before can move forward:
 
-   * Domoticz issue, there are some conflict around SQLITE3 usage [Issue #4312](https://github.com/domoticz/domoticz/issues/4312)
    * Zigpy library and quirk are developped for Home Automation with no documentation on how to use. These are very focus on the HA design. Using Zigpy on Domoticz required a lot of work at that stage :
       1. Understand how to use zigpy
       2. Understand what to do in order to have a correct setup (inside the plugin) to get all events from devices
@@ -40,8 +35,7 @@ For now there are a number of show stoppers that need to be solved/sorted/fixed 
 
 Unfortunatly at that stage, I am probably not able to move forward:
 
-1. Risk to develop a plugin based on assumption that Domoticz sqlite3 issue will be fixed.
-2. Required a lot of time to be spent in order to understand how the zigpy library .
+1. Required a lot of time to be spent in order to understand how the zigpy library .
 
 
 ## TO BE ADDRESSED
