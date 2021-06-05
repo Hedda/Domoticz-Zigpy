@@ -83,16 +83,19 @@
 import sys
 sys.path.append('/usr/lib/python3.9/site-packages')
 sys.path.append('/var/lib/domoticz/plugins/Domoticz-Zigpy/Zigpy-Libs')
-import Domoticz
+
 import asyncio
 import threading
 import logging
 
+import Domoticz
+try:
+    from Domoticz import Devices, Parameters
+except ImportError:
+    pass
 
-PERSISTENT_DB = 'Data/zigpy'
 
 # There are many different radio libraries but they all have the same API
-
 
 
 import zigpy.config as config
@@ -104,146 +107,6 @@ import pathlib
 import zigpy.types
 from zigpy.zdo import types as zdo_t
 
-
-class MainListener:
-    """
-    Contains callbacks that zigpy will call whenever something happens.
-    Look for `listener_event` in the Zigpy source or just look at the logged warnings.
-    """
-    def __init__(self, application, Devices):
-        Domoticz.Log("MainListener init App: %s Devices: %s" %(application, Devices))
-        self.application = application
-        self.domoticzDevices = Devices
-
-    def device_joined(self, device):
-        Domoticz.Log(f"Device joined: {device}")
-        Domoticz.Log(" - NwkId: %s" %device.nwk)
-        Domoticz.Log(" - IEEE: %s" %device._ieee)
-
-
-    def device_announce(self, zigpy_device):
-        Domoticz.Log("device_announce Zigpy Device: %s" %(zigpy_device))
-
-
-    def device_initialized(self, device, *, new=True):
-        # Called at runtime after a device's information has been queried.
-        # I also call it on startup to load existing devices from the DB.
-
-        LOGGER.info("Device is ready: new=%s, device=%s NwkId: %s IEEE: %s signature=%s", new, device, device.nwk, device._ieee, device.get_signature())   
-        if new and device.nwk != 0x0000 and len( device.get_signature()) > 0:   
-            Domoticz.Debug("Calling domoCreateDevice")
-            device_signature = device.get_signature()
-            if 'device_type' in device_signature:
-                Domoticz.Debug("Device Type: %s (%s)" %(device_signature['device_type'], type(device_signature['device_type'])))
-            domoCreateDevice( self, device._ieee, device.get_signature() )
-
-        for ep_id, endpoint in device.endpoints.items():
-            # Ignore ZDO
-            if ep_id == 0:
-                continue
-
-            # You need to attach a listener to every cluster to receive events
-            for cluster in endpoint.in_clusters.values():
-                # The context listener passes its own object as the first argument
-                # to the callback
-                cluster.add_context_listener(self)
-
-    #def device_left(self, device):
-    #    pass
-
-
-    #def device_removed(self, device):
-    #    pass
-
-
-    def cluster_command(self, cluster, command_id, *args):
-        #Handle commands received to this cluster.
-        # Each object is linked to its parent (i.e. app > device > endpoint > cluster)
-        device = cluster.endpoint.device
-        Domoticz.Log("cluster_command - Cluster: %s ClusterId: 0x%04x command_id: %s args: %s" %(cluster, cluster.cluster_id, command_id, args))
-
-
-    def attribute_updated(self, cluster, attribute_id, value):
-        # Each object is linked to its parent (i.e. app > device > endpoint > cluster)
-        device = cluster.endpoint.device
-        Domoticz.Log("Device Signature: %s" %device.get_signature())
-        Domoticz.Log("Received an attribute update %s=%s on cluster %s from device %s/%s" %( attribute_id, value, cluster, device, device._ieee) )
-        Domoticz.Log("     - cluster: %s type: %s" %(cluster, type(cluster)))
-        Domoticz.Log("Cluster %04x Attribute: %s value: %s type(%s)" %(cluster.cluster_id, attribute_id, value, type(value)))
-        domoMajDevice( self, device._ieee, cluster.cluster_id, attribute_id, value )
-
-async def main( self ):
-
-    logging.basicConfig(level=logging.DEBUG)  
-    import zigpy.config as conf
-    # Make sure that we have the quirks embedded.
-    try:
-        import zhaquirks  # noqa: F401
-        Domoticz.Debug( "Module zhaquirks loaded")
-    except:
-        Domoticz.Error( "Module zhaquirks not loaded")
-
-    Domoticz.Log("Entering in main ....")
-    if self.domoticzParameters["Mode2"] in ( 'USB', 'DIN'):
-        path = self.domoticzParameters["SerialPort"]
-    elif self.domoticzParameters["Mode2"] == 'PI':
-        path = 'pizigate:%s' %self.domoticzParameters["SerialPort"]
-    elif self.domoticzParameters["Mode2"] == 'Wifi':
-        path = 'socket://%s:%s' %(self.domoticzParameters["Address"], self.domoticzParameters["Port"])
-    else:
-        Domoticz.Error("Mode: %s Not implemented Yet" %self.domoticzParameters["Mode2"])
-        return
-
-    # Config required to connect to a given device
-    device_config = {
-        conf.CONF_DEVICE_PATH: path,
-    }
-
-    # Config required to setup zigpy
-    zigpy_config = {
-        conf.CONF_DATABASE: self.domoticzParameters["HomeFolder"] + PERSISTENT_DB + '.db',
-        conf.CONF_DEVICE: device_config
-    }
-
-    if self.domoticzParameters["Mode1"] == 'zigate':
-        from zigpy_zigate.zigbee.application import ControllerApplication
-
-    elif self.domoticzParameters["Mode1"] == 'znp':
-        from zigpy_znp.zigbee.application import ControllerApplication
-
-    elif self.domoticzParameters["Mode1"] == 'bellows':
-        from bellows.zigbee.application import ControllerApplication
-
-    else:
-        Domoticz.Error("Mode: %s Not implemented Yet" %self.domoticzParameters["Mode1"])
-        return
-
-    # This is unnecessary unless you want to autodetect the radio module that will work
-    # with a given port
-    #does_radio_work = await ControllerApplication.probe(conf.SCHEMA_DEVICE(device_config))
-
-    self.zigpyApp = await ControllerApplication.new(
-        config=ControllerApplication.SCHEMA(zigpy_config),
-        auto_form=True,
-        start_radio=True,
-    )
-
-    listener = MainListener( self.zigpyApp, self.domoticzDevices )
-    self.zigpyApp.add_listener(listener)
-
-    # Have every device in the database fire the same event so you can attach listeners
-    for device in self.zigpyApp.devices.values():
-        listener.device_initialized(device, new=False)
-
-    # Permit joins for a minute
-    await self.zigpyApp.permit(240)
-    await asyncio.sleep(240)
-
-    # Run forever
-    Domoticz.Log("Starting work loop")
-    await asyncio.get_running_loop().create_future()
-    Domoticz.Log("Exiting work loop")
-
 class BasePlugin:
 
     def __init__(self):
@@ -254,37 +117,20 @@ class BasePlugin:
         
         logging.basicConfig(level=logging.INFO)     
 
-    def get_devices(self):
-        devices = []
-
-        for ieee, dev in self.zigpyApp.devices.items():
-            device = {
-                "ieee": self._ieee_to_number(ieee),
-                "nwk": dev.nwk,
-                "endpoints": []
-            }
-            for epid, ep in dev.endpoints.items():
-                if epid == 0:
-                    continue
-                device["endpoints"].append({
-                    "id": epid,
-                    "input_clusters": [in_cluster for in_cluster in ep.in_clusters] if hasattr(ep, "in_clusters") else [],
-                    "output_clusters": [out_cluster for out_cluster in ep.out_clusters] if hasattr(ep, "out_clusters") else [],
-                    "status": "uninitialized" if ep.status == zigpy.endpoint.Status.NEW else "initialized"
-                })
-
-            devices.append(device)
-        return devices
 
     def zigpy_thread( self ):
-            try:
-                Domoticz.Log("Starting the thread")
-                asyncio.run( main( self ) )
-                Domoticz.Log("Thread ended")
 
-            except Exception as e:
-                handle_thread_error( self, e)
-                Domoticz.Error("zigpy_thread - Error on asyncio.run: %s" %e)
+        from Modules.handle_thread_error import handle_thread_error
+        from Modules.zp_main import main
+
+        try:
+            Domoticz.Log("Starting the thread")
+            asyncio.run( main( self ) )
+            Domoticz.Log("Thread ended")
+
+        except Exception as e:
+            handle_thread_error( self, e)
+            Domoticz.Error("zigpy_thread - Error on asyncio.run: %s" %e)
 
     def onStart(self):
 
@@ -322,247 +168,6 @@ class BasePlugin:
     def onHeartbeat(self):
         #Domoticz.Log("onHeartbeat called")
         pass
-
-def domoMajDevice( self, device_ieee, cluster, attribute_id, value ):
-
-    Domoticz.Debug("domoMajDevice - Device_ieee: %s cluster: %s attribute_id: %s value: %s" %(device_ieee, cluster, attribute_id, value))
-    needed_widget_type = get_type_from_cluster( cluster )
-
-    #Domoticz.Debug("---> Cluster to Widget: %s" %needed_widget_type)
-    #Domoticz.Debug("---> Attribute 0x%04x %s" %(attribute_id, attribute_id))
-    if needed_widget_type is None:
-        return
-
-    #Domoticz.Debug("--> Unit list: %s" %device_list_units( self, device_ieee))
-
-    for unit in device_list_units( self, device_ieee):
-        #Domoticz.Debug("-------- Checking unit: %s" %unit)
-        if needed_widget_type != get_TypeName_from_device( self, unit ):
-            #Domoticz.Debug("------------ %s != %s" %(needed_widget_type, get_TypeName_from_device( self, unit )))
-            continue
-
-        #Domoticz.Debug("---- Unit %d found !!" %unit)
-
-        if needed_widget_type == 'Lux' and attribute_id == 0x0000:
-            Domoticz.Debug("Updating -----> Lux")
-            nValue = int(value)
-            sValue = str(nValue)
-            UpdateDevice(self, unit, nValue, sValue )
-            break
-
-        elif needed_widget_type == 'Motion' and attribute_id == 0x0000:
-            Domoticz.Debug("Updating-----> Motion")
-            if bool(value):
-                nValue = 1
-                sValue = 'On'
-            else:
-                nValue = 0
-                sValue = 'Off'
-            UpdateDevice(self, unit, nValue, sValue )
-            break
-
-        elif needed_widget_type == 'Switch' and attribute_id == 0x0000:
-            if bool(value):
-                nValue = 1
-                sValue = 'On'
-            else:
-                nValue = 0
-                sValue = 'Off'
-            UpdateDevice(self, unit, nValue, sValue )
-            break
-
-        elif needed_widget_type == 'Humi' and attribute_id == 0x0000:
-            nValue = int(value/100)
-            # Humidity Status
-            if nValue < 40:
-                humiStatus = 2
-            elif 40 <= nValue < 70:
-                humiStatus = 1
-            else:
-                humiStatus = 3
-            sValue = str(humiStatus)
-            Domoticz.Debug("-->Humi %s:%s" %(nValue, sValue))
-            UpdateDevice(self, unit, nValue, sValue )
-            break
-
-        elif needed_widget_type == 'Baro' and attribute_id == 0x0000:
-            nValue = int( value)
-            if nValue < 1000:
-                sValue = '%s;4' %nValue # RAIN
-            elif nValue < 1020:
-                sValue = '%s;3' %nValue # CLOUDY
-            elif nValue < 1030:
-                sValue = '%s;2' %nValue # PARTLY CLOUDY
-            else:
-                sValue = '%s;1' %nValue # SUNNY
-            Domoticz.Debug("-->Baro %s:%s" %(nValue, sValue))
-            UpdateDevice(self, unit, nValue, sValue )
-            break
-
-        elif needed_widget_type == 'Temp' and attribute_id == 0x0000:
-            nValue = round(int(value)/100,1)
-            sValue = str(nValue)
-            Domoticz.Debug("-->Temp %s:%s" %(nValue, sValue))
-            UpdateDevice(self, unit, int(nValue), sValue )
-            break
-
-
-
-def get_TypeName_from_device( self, unit):
-    
-    MATRIX_TYPENAME = {
-        (246,1,0): "Lux",
-        (244,73,8): "Motion",
-        (244,73,0): "Switch", 
-        (80,5,0): 'Temp',
-        (243,26,0): 'Baro',
-        (81,1,0): 'Humi',
-    }
-
-    Type = self.domoticzDevices[ unit ].Type
-    Subtype = self.domoticzDevices[ unit ].SubType
-    SwitchType = self.domoticzDevices[ unit ].SwitchType
-
-    if ( Type, Subtype, SwitchType ) in MATRIX_TYPENAME:
-        Domoticz.Debug("(%s,%s,%s) matching with %s" %(Type, Subtype, SwitchType, MATRIX_TYPENAME[  ( Type, Subtype, SwitchType ) ]))
-        return MATRIX_TYPENAME[  ( Type, Subtype, SwitchType ) ]
-
-    return None
-    
-
-def device_list_units( self, device_ieee):
-    return [ x for x in self.domoticzDevices if self.domoticzDevices[x].DeviceID == str(device_ieee) ]
-
-def UpdateDevice(self, Unit, nValue, sValue ):
-
-    # Make sure that the Domoticz device still exists (they can be deleted) before updating it
-    if Unit not in self.domoticzDevices:
-        Domoticz.Error("UpdateDevice Unit %s not found!" %Unit)
-        return
-
-    if (self.domoticzDevices[Unit].nValue == nValue) and (self.domoticzDevices[Unit].sValue == sValue):
-        return
-
-    Domoticz.Log("UpdateDevice Devices[%s].Name: %s --> %s:%s" %(Unit, self.domoticzDevices[Unit].Name, nValue, sValue))
-    self.domoticzDevices[Unit].Update( nValue=nValue, sValue=sValue)
-
-def domoCreateDevice( self, device_ieee, device_signature):
-
-    Domoticz.Debug("device_signature: %s" %device_signature)
-    if 'model' in device_signature:
-        Domoticz.Debug(" - Model: %s" %device_signature['model'])
-
-    if 'node_desc' in device_signature:
-        Domoticz.Debug(" - Node Desciptor: %s" %device_signature['node_desc'])
-
-    if 'endpoints' in device_signature:
-        device_signature_endpoint = device_signature[ 'endpoints']
-
-    for ep in device_signature_endpoint:
-        
-        Domoticz.Debug(" --> ep: %s" %ep)
-        in_cluster = device_signature_endpoint[ep]['input_clusters']
-        out_cluster = device_signature_endpoint[ep]['output_clusters']
-        for cluster in set(in_cluster+out_cluster):
-            Domoticz.Debug("----> Cluster: %s" %cluster)
-            widget_type = get_type_from_cluster( cluster )
-            Domoticz.Debug("---------> Widget Type: %s" %widget_type)
-
-            if widget_type is None:
-                continue
-        
-            elif widget_type == 'Switch':
-                Domoticz.Debug("----> Create Switch")
-                createDomoticzWidget( self, device_ieee, ep, widget_type, Type_ = 244, Subtype_ = 73, Switchtype_ = 0 )
-
-            elif widget_type == 'Lux':
-                Domoticz.Debug("----> Create Lux")
-                createDomoticzWidget( self, device_ieee, ep, widget_type, Type_ = 246, Subtype_ = 1, Switchtype_ = 0 )
-                
-            elif widget_type == 'Motion':
-                Domoticz.Debug("----> Create Motion")
-                createDomoticzWidget( self, device_ieee, ep, widget_type, widgetType='Motion')
-
-            elif widget_type == 'Temp':
-                createDomoticzWidget( self, device_ieee, ep, widget_type, widgetType="Temperature")
-
-            elif widget_type == 'Humi':
-                createDomoticzWidget( self, device_ieee, ep, widget_type, widgetType="Humidity")
-
-            elif widget_type == 'Baro':
-                createDomoticzWidget( self, device_ieee, ep, widget_type, widgetType="Barometer")
-
-            elif widget_type == 'Venetian':
-                createDomoticzWidget( self, device_ieee, ep, widget_type, Type_ = 244, Subtype_ = 73, Switchtype_ = 15 )
-
-            elif widget_type == 'LvlControl':
-                createDomoticzWidget( self, device_ieee, ep, widget_type, Type_ = 244, Subtype_ = 73, Switchtype_ = 7 )
- 
-def createDomoticzWidget( self, ieee, ep, cType, widgetType = None,
-                         Type_ = None, Subtype_ = None, Switchtype_ = None ): 
-
-    Domoticz.Debug("createDomoticzWidget")
-    unit = getFreeUnit(self)
-    Domoticz.Debug("--> Unit: %s" %unit)
-    widgetName = '%s %s - %s' %(cType, ieee, ep )
-    Domoticz.Debug("--> widgetName: %s" %widgetName)
-    if widgetType:
-        Domoticz.Debug("Creating device is Domoticz DeviceID:%s Name: %s Unit: %s TypeName: %s" %(ieee, widgetName, unit, widgetType))
-        myDev = Domoticz.Device( DeviceID = str(ieee), Name = widgetName, Unit = unit, TypeName = widgetType )
-
-    elif Type_ is not None and Subtype_ is not None and Switchtype_ is not None:
-        myDev = Domoticz.Device( DeviceID = str(ieee), Name = widgetName, Unit = unit, Type = Type_, Subtype = Subtype_, Switchtype = Switchtype_ )
-
-    else:
-        Domoticz.Error("createDomoticzWidget cannot create widget for %s" %(widgetName))
-        return
-    
-    myDev.Create()
-    ID = myDev.ID
-    if myDev.ID == -1 :
-        Domoticz.Error("Domoticz widget creation failed. Check that Domoticz can Accept New Hardware [%s]" %myDev )
-
-
-
-def getFreeUnit(self, nbunit_=1):
-    '''
-    FreeUnit
-    Look for a Free Unit number. If nbunit > 1 then we look for nbunit consecutive slots
-    '''
-    Domoticz.Debug("getFreeUnit - Devices: %s" %len(self.domoticzDevices))
-    return len(self.domoticzDevices) + 1
-
-def get_type_from_cluster( cluster ):
-    # return a Widget Type list based on the available Cluster 
-
-    TYPE_LIST = {
-        0x0006: 'Switch',
-        0x0008: 'LvlControl',
-        0x0102: 'Venetian',
-        0x0400: 'Lux',
-        0x0402: 'Temp',
-        0x0403: 'Baro',
-        0x0405: 'Humi',
-        0x0406: 'Motion'
-    }
-    if cluster not in TYPE_LIST:
-        return None
-    return TYPE_LIST[ cluster ]
-
-
-def handle_thread_error( self, e):
-    trace = []
-    tb = e.__traceback__
-    Domoticz.Error("'%s' failed '%s'" %(tb.tb_frame.f_code.co_name, str(e)))
-    while tb is not None:
-        trace.append(
-            {
-            "Module": tb.tb_frame.f_code.co_filename,
-            "Function": tb.tb_frame.f_code.co_name,
-            "Line": tb.tb_lineno
-        })
-        Domoticz.Error("----> Line %s in '%s', function %s" %( tb.tb_lineno, tb.tb_frame.f_code.co_filename,  tb.tb_frame.f_code.co_name,  ))
-        tb = tb.tb_next
 
 
 global _plugin
