@@ -285,6 +285,7 @@ class BasePlugin:
                 Domoticz.Log("Thread ended")
 
             except Exception as e:
+                handle_thread_error( self, e)
                 Domoticz.Error("zigpy_thread - Error on asyncio.run: %s" %e)
 
     def onStart(self):
@@ -328,19 +329,27 @@ def domoMajDevice( self, device_ieee, cluster, attribute_id, value ):
     Domoticz.Log("domoMajDevice - Device_ieee: %s cluster: %s attribute_id: %s value: %s" %(device_ieee, cluster, attribute_id, value))
     needed_widget_type = get_type_from_cluster( cluster )
 
-    Domoticz.Log("---> Cluster to Widget: %s" %needed_widget_type)
+    #Domoticz.Log("---> Cluster to Widget: %s" %needed_widget_type)
+    #Domoticz.Log("---> Attribute 0x%04x %s" %(attribute_id, attribute_id))
     if needed_widget_type is None:
         return
 
+    #Domoticz.Log("--> Unit list: %s" %device_list_units( self, device_ieee))
+
     for unit in device_list_units( self, device_ieee):
+        #Domoticz.Log("-------- Checking unit: %s" %unit)
         if needed_widget_type != get_TypeName_from_device( self, unit ):
+            #Domoticz.Log("------------ %s != %s" %(needed_widget_type, get_TypeName_from_device( self, unit )))
             continue
+
+        #Domoticz.Log("---- Unit %d found !!" %unit)
 
         if needed_widget_type == 'Lux' and attribute_id == 0x0000:
             Domoticz.Log("Updating -----> Lux")
             nValue = int(value)
             sValue = str(nValue)
             UpdateDevice(self, unit, nValue, sValue )
+            break
 
         elif needed_widget_type == 'Motion' and attribute_id == 0x0000:
             Domoticz.Log("Updating-----> Motion")
@@ -351,6 +360,7 @@ def domoMajDevice( self, device_ieee, cluster, attribute_id, value ):
                 nValue = 0
                 sValue = 'Off'
             UpdateDevice(self, unit, nValue, sValue )
+            break
 
         elif needed_widget_type == 'Switch' and attribute_id == 0x0000:
             if bool(value):
@@ -360,6 +370,44 @@ def domoMajDevice( self, device_ieee, cluster, attribute_id, value ):
                 nValue = 0
                 sValue = 'Off'
             UpdateDevice(self, unit, nValue, sValue )
+            break
+
+        elif needed_widget_type == 'Humi' and attribute_id == 0x0000:
+            nValue = int(value/100)
+            # Humidity Status
+            if nValue < 40:
+                humiStatus = 2
+            elif 40 <= nValue < 70:
+                humiStatus = 1
+            else:
+                humiStatus = 3
+            sValue = str(humiStatus)
+            Domoticz.Log("-->Humi %s:%s" %(nValue, sValue))
+            UpdateDevice(self, unit, nValue, sValue )
+            break
+
+        elif needed_widget_type == 'Baro' and attribute_id == 0x0000:
+            nValue = int( value)
+            if nValue < 1000:
+                sValue = '%s;4' %nValue # RAIN
+            elif nValue < 1020:
+                sValue = '%s;3' %nValue # CLOUDY
+            elif nValue < 1030:
+                sValue = '%s;2' %nValue # PARTLY CLOUDY
+            else:
+                sValue = '%s;1' %nValue # SUNNY
+            Domoticz.Log("-->Baro %s:%s" %(nValue, sValue))
+            UpdateDevice(self, unit, nValue, sValue )
+            break
+
+        elif needed_widget_type == 'Temp' and attribute_id == 0x0000:
+            nValue = round(int(value)/100,1)
+            sValue = str(nValue)
+            Domoticz.Log("-->Temp %s:%s" %(nValue, sValue))
+            UpdateDevice(self, unit, int(nValue), sValue )
+            break
+
+
 
 def get_TypeName_from_device( self, unit):
     
@@ -367,6 +415,9 @@ def get_TypeName_from_device( self, unit):
         (246,1,0): "Lux",
         (244,73,8): "Motion",
         (244,73,0): "Switch", 
+        (80,5,0): 'Temp',
+        (243,26,0): 'Baro',
+        (81,1,0): 'Humi',
     }
 
     Type = self.domoticzDevices[ unit ].Type
@@ -374,7 +425,7 @@ def get_TypeName_from_device( self, unit):
     SwitchType = self.domoticzDevices[ unit ].SwitchType
 
     if ( Type, Subtype, SwitchType ) in MATRIX_TYPENAME:
-        Domoticz.Log("(%s,%s,%s) matching with %s" %(Type, Subtype, SwitchType, MATRIX_TYPENAME[  ( Type, Subtype, SwitchType ) ]))
+        #Domoticz.Log("(%s,%s,%s) matching with %s" %(Type, Subtype, SwitchType, MATRIX_TYPENAME[  ( Type, Subtype, SwitchType ) ]))
         return MATRIX_TYPENAME[  ( Type, Subtype, SwitchType ) ]
 
     return None
@@ -385,8 +436,6 @@ def device_list_units( self, device_ieee):
 
 def UpdateDevice(self, Unit, nValue, sValue ):
 
-    Domoticz.Log("UpdateDevice - Unit: %s %s:%s" %(Unit, nValue, sValue))
-
     # Make sure that the Domoticz device still exists (they can be deleted) before updating it
     if Unit not in self.domoticzDevices:
         Domoticz.Error("UpdateDevice Unit %s not found!" %Unit)
@@ -395,7 +444,8 @@ def UpdateDevice(self, Unit, nValue, sValue ):
     if (self.domoticzDevices[Unit].nValue == nValue) and (self.domoticzDevices[Unit].sValue == sValue):
         return
 
-    Domoticz.Log("UpdateDevice %s %s:%s" %(self.domoticzDevices[Unit].Name, nValue, sValue))
+    Domoticz.Log("UpdateDevice Devices[%s].Name: %s --> %s:%s" %(Unit, self.domoticzDevices[Unit].Name, nValue, sValue))
+    Domoticz.Log("             nValue: %s sValue: %s" %(type(nValue), type(sValue)))
     self.domoticzDevices[Unit].Update( nValue=nValue, sValue=sValue)
 
 def domoCreateDevice( self, device_ieee, device_signature):
@@ -500,6 +550,22 @@ def get_type_from_cluster( cluster ):
     if cluster not in TYPE_LIST:
         return None
     return TYPE_LIST[ cluster ]
+
+
+def handle_thread_error( self, e):
+    trace = []
+    tb = e.__traceback__
+    Domoticz.Error("'%s' failed '%s'" %(tb.tb_frame.f_code.co_name, str(e)))
+    while tb is not None:
+        trace.append(
+            {
+            "Module": tb.tb_frame.f_code.co_filename,
+            "Function": tb.tb_frame.f_code.co_name,
+            "Line": tb.tb_lineno
+        })
+        Domoticz.Error("----> Line %s in '%s', function %s" %( tb.tb_lineno, tb.tb_frame.f_code.co_filename,  tb.tb_frame.f_code.co_name,  ))
+        tb = tb.tb_next
+
 
 global _plugin
 _plugin = BasePlugin()
