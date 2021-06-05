@@ -131,10 +131,10 @@ class MainListener:
 
         LOGGER.info("Device is ready: new=%s, device=%s NwkId: %s IEEE: %s signature=%s", new, device, device.nwk, device._ieee, device.get_signature())   
         if new and device.nwk != 0x0000 and len( device.get_signature()) > 0:   
-            Domoticz.Log("Calling domoCreateDevice")
+            Domoticz.Debug("Calling domoCreateDevice")
             device_signature = device.get_signature()
             if 'device_type' in device_signature:
-                Domoticz.Log("Device Type: %s (%s)" %(device_signature['device_type'], type(device_signature['device_type'])))
+                Domoticz.Debug("Device Type: %s (%s)" %(device_signature['device_type'], type(device_signature['device_type'])))
             domoCreateDevice( self, device._ieee, device.get_signature() )
 
         for ep_id, endpoint in device.endpoints.items():
@@ -168,6 +168,7 @@ class MainListener:
         device = cluster.endpoint.device
         Domoticz.Log("Device Signature: %s" %device.get_signature())
         Domoticz.Log("Received an attribute update %s=%s on cluster %s from device %s/%s" %( attribute_id, value, cluster, device, device._ieee) )
+        Domoticz.Log("     - cluster: %s type: %s" %(cluster, type(cluster)))
         Domoticz.Log("Cluster %04x Attribute: %s value: %s type(%s)" %(cluster.cluster_id, attribute_id, value, type(value)))
         domoMajDevice( self, device._ieee, cluster.cluster_id, attribute_id, value )
 
@@ -178,12 +179,9 @@ async def main( self ):
     # Make sure that we have the quirks embedded.
     try:
         import zhaquirks  # noqa: F401
-        Domoticz.Log( "Module zhaquirks loaded")
+        Domoticz.Debug( "Module zhaquirks loaded")
     except:
         Domoticz.Error( "Module zhaquirks not loaded")
-
-    sys.path.append('/usr/lib/python3.9/site-packages')
-    sys.path.append('/var/lib/domoticz/plugins/Domoticz-Zigpy/Zigpy-Libs') 
 
     Domoticz.Log("Entering in main ....")
     if self.domoticzParameters["Mode2"] in ( 'USB', 'DIN'):
@@ -289,6 +287,7 @@ class BasePlugin:
                 Domoticz.Error("zigpy_thread - Error on asyncio.run: %s" %e)
 
     def onStart(self):
+
         logging.basicConfig(level=logging.INFO)
         self.domoticzParameters = dict(Parameters)
         DumpConfigToLog()
@@ -326,33 +325,33 @@ class BasePlugin:
 
 def domoMajDevice( self, device_ieee, cluster, attribute_id, value ):
 
-    Domoticz.Log("domoMajDevice - Device_ieee: %s cluster: %s attribute_id: %s value: %s" %(device_ieee, cluster, attribute_id, value))
+    Domoticz.Debug("domoMajDevice - Device_ieee: %s cluster: %s attribute_id: %s value: %s" %(device_ieee, cluster, attribute_id, value))
     needed_widget_type = get_type_from_cluster( cluster )
 
-    #Domoticz.Log("---> Cluster to Widget: %s" %needed_widget_type)
-    #Domoticz.Log("---> Attribute 0x%04x %s" %(attribute_id, attribute_id))
+    #Domoticz.Debug("---> Cluster to Widget: %s" %needed_widget_type)
+    #Domoticz.Debug("---> Attribute 0x%04x %s" %(attribute_id, attribute_id))
     if needed_widget_type is None:
         return
 
-    #Domoticz.Log("--> Unit list: %s" %device_list_units( self, device_ieee))
+    #Domoticz.Debug("--> Unit list: %s" %device_list_units( self, device_ieee))
 
     for unit in device_list_units( self, device_ieee):
-        #Domoticz.Log("-------- Checking unit: %s" %unit)
+        #Domoticz.Debug("-------- Checking unit: %s" %unit)
         if needed_widget_type != get_TypeName_from_device( self, unit ):
-            #Domoticz.Log("------------ %s != %s" %(needed_widget_type, get_TypeName_from_device( self, unit )))
+            #Domoticz.Debug("------------ %s != %s" %(needed_widget_type, get_TypeName_from_device( self, unit )))
             continue
 
-        #Domoticz.Log("---- Unit %d found !!" %unit)
+        #Domoticz.Debug("---- Unit %d found !!" %unit)
 
         if needed_widget_type == 'Lux' and attribute_id == 0x0000:
-            Domoticz.Log("Updating -----> Lux")
+            Domoticz.Debug("Updating -----> Lux")
             nValue = int(value)
             sValue = str(nValue)
             UpdateDevice(self, unit, nValue, sValue )
             break
 
         elif needed_widget_type == 'Motion' and attribute_id == 0x0000:
-            Domoticz.Log("Updating-----> Motion")
+            Domoticz.Debug("Updating-----> Motion")
             if bool(value):
                 nValue = 1
                 sValue = 'On'
@@ -382,7 +381,7 @@ def domoMajDevice( self, device_ieee, cluster, attribute_id, value ):
             else:
                 humiStatus = 3
             sValue = str(humiStatus)
-            Domoticz.Log("-->Humi %s:%s" %(nValue, sValue))
+            Domoticz.Debug("-->Humi %s:%s" %(nValue, sValue))
             UpdateDevice(self, unit, nValue, sValue )
             break
 
@@ -396,14 +395,14 @@ def domoMajDevice( self, device_ieee, cluster, attribute_id, value ):
                 sValue = '%s;2' %nValue # PARTLY CLOUDY
             else:
                 sValue = '%s;1' %nValue # SUNNY
-            Domoticz.Log("-->Baro %s:%s" %(nValue, sValue))
+            Domoticz.Debug("-->Baro %s:%s" %(nValue, sValue))
             UpdateDevice(self, unit, nValue, sValue )
             break
 
         elif needed_widget_type == 'Temp' and attribute_id == 0x0000:
             nValue = round(int(value)/100,1)
             sValue = str(nValue)
-            Domoticz.Log("-->Temp %s:%s" %(nValue, sValue))
+            Domoticz.Debug("-->Temp %s:%s" %(nValue, sValue))
             UpdateDevice(self, unit, int(nValue), sValue )
             break
 
@@ -425,7 +424,7 @@ def get_TypeName_from_device( self, unit):
     SwitchType = self.domoticzDevices[ unit ].SwitchType
 
     if ( Type, Subtype, SwitchType ) in MATRIX_TYPENAME:
-        #Domoticz.Log("(%s,%s,%s) matching with %s" %(Type, Subtype, SwitchType, MATRIX_TYPENAME[  ( Type, Subtype, SwitchType ) ]))
+        Domoticz.Debug("(%s,%s,%s) matching with %s" %(Type, Subtype, SwitchType, MATRIX_TYPENAME[  ( Type, Subtype, SwitchType ) ]))
         return MATRIX_TYPENAME[  ( Type, Subtype, SwitchType ) ]
 
     return None
@@ -445,44 +444,43 @@ def UpdateDevice(self, Unit, nValue, sValue ):
         return
 
     Domoticz.Log("UpdateDevice Devices[%s].Name: %s --> %s:%s" %(Unit, self.domoticzDevices[Unit].Name, nValue, sValue))
-    Domoticz.Log("             nValue: %s sValue: %s" %(type(nValue), type(sValue)))
     self.domoticzDevices[Unit].Update( nValue=nValue, sValue=sValue)
 
 def domoCreateDevice( self, device_ieee, device_signature):
 
-    Domoticz.Log("device_signature: %s" %device_signature)
+    Domoticz.Debug("device_signature: %s" %device_signature)
     if 'model' in device_signature:
-        Domoticz.Log(" - Model: %s" %device_signature['model'])
+        Domoticz.Debug(" - Model: %s" %device_signature['model'])
 
     if 'node_desc' in device_signature:
-        Domoticz.Log(" - Node Desciptor: %s" %device_signature['node_desc'])
+        Domoticz.Debug(" - Node Desciptor: %s" %device_signature['node_desc'])
 
     if 'endpoints' in device_signature:
         device_signature_endpoint = device_signature[ 'endpoints']
 
     for ep in device_signature_endpoint:
         
-        Domoticz.Log(" --> ep: %s" %ep)
+        Domoticz.Debug(" --> ep: %s" %ep)
         in_cluster = device_signature_endpoint[ep]['input_clusters']
         out_cluster = device_signature_endpoint[ep]['output_clusters']
         for cluster in set(in_cluster+out_cluster):
-            Domoticz.Log("----> Cluster: %s" %cluster)
+            Domoticz.Debug("----> Cluster: %s" %cluster)
             widget_type = get_type_from_cluster( cluster )
-            Domoticz.Log("---------> Widget Type: %s" %widget_type)
+            Domoticz.Debug("---------> Widget Type: %s" %widget_type)
 
             if widget_type is None:
                 continue
         
             elif widget_type == 'Switch':
-                Domoticz.Log("----> Create Switch")
+                Domoticz.Debug("----> Create Switch")
                 createDomoticzWidget( self, device_ieee, ep, widget_type, Type_ = 244, Subtype_ = 73, Switchtype_ = 0 )
 
             elif widget_type == 'Lux':
-                Domoticz.Log("----> Create Lux")
+                Domoticz.Debug("----> Create Lux")
                 createDomoticzWidget( self, device_ieee, ep, widget_type, Type_ = 246, Subtype_ = 1, Switchtype_ = 0 )
                 
             elif widget_type == 'Motion':
-                Domoticz.Log("----> Create Motion")
+                Domoticz.Debug("----> Create Motion")
                 createDomoticzWidget( self, device_ieee, ep, widget_type, widgetType='Motion')
 
             elif widget_type == 'Temp':
@@ -503,13 +501,13 @@ def domoCreateDevice( self, device_ieee, device_signature):
 def createDomoticzWidget( self, ieee, ep, cType, widgetType = None,
                          Type_ = None, Subtype_ = None, Switchtype_ = None ): 
 
-    Domoticz.Log("createDomoticzWidget")
+    Domoticz.Debug("createDomoticzWidget")
     unit = getFreeUnit(self)
-    Domoticz.Log("--> Unit: %s" %unit)
-    widgetName = '%s %s - %s' %(widgetType, ieee, ep )
-    Domoticz.Log("--> widgetName: %s" %widgetName)
+    Domoticz.Debug("--> Unit: %s" %unit)
+    widgetName = '%s %s - %s' %(cType, ieee, ep )
+    Domoticz.Debug("--> widgetName: %s" %widgetName)
     if widgetType:
-        Domoticz.Log("Creating device is Domoticz DeviceID:%s Name: %s Unit: %s TypeName: %s" %(ieee, widgetName, unit, widgetType))
+        Domoticz.Debug("Creating device is Domoticz DeviceID:%s Name: %s Unit: %s TypeName: %s" %(ieee, widgetName, unit, widgetType))
         myDev = Domoticz.Device( DeviceID = str(ieee), Name = widgetName, Unit = unit, TypeName = widgetType )
 
     elif Type_ is not None and Subtype_ is not None and Switchtype_ is not None:
@@ -531,7 +529,7 @@ def getFreeUnit(self, nbunit_=1):
     FreeUnit
     Look for a Free Unit number. If nbunit > 1 then we look for nbunit consecutive slots
     '''
-    Domoticz.Log("getFreeUnit - Devices: %s" %len(self.domoticzDevices))
+    Domoticz.Debug("getFreeUnit - Devices: %s" %len(self.domoticzDevices))
     return len(self.domoticzDevices) + 1
 
 def get_type_from_cluster( cluster ):
