@@ -64,7 +64,7 @@
 
         <param field="Mode4" label="Listening port for Web Admin GUI " width="75px" required="true" default="9440" />
 
-        <param field="Mode6" label="Verbors and Debuging" width="150px" required="true" default="None">
+        <param field="Mode6" label="Verbors and Loging" width="150px" required="true" default="None">
             <options>
                         <option label="None" value="0"  default="true"/>
                         <option label="Plugin Verbose" value="2"/>
@@ -82,7 +82,7 @@
 
 import sys
 sys.path.append('/usr/lib/python3.9/site-packages')
-sys.path.append('/var/lib/domoticz/plugins/Domoticz-Zigpy')
+sys.path.append('/var/lib/domoticz/plugins/Domoticz-Zigpy/Zigpy-Libs')
 import Domoticz
 import asyncio
 import threading
@@ -117,8 +117,8 @@ class MainListener:
 
     def device_joined(self, device):
         Domoticz.Log(f"Device joined: {device}")
-        Domoticz.Debug(" - NwkId: %s" %device.nwk)
-        Domoticz.Debug(" - IEEE: %s" %device._ieee)
+        Domoticz.Log(" - NwkId: %s" %device.nwk)
+        Domoticz.Log(" - IEEE: %s" %device._ieee)
 
 
     def device_announce(self, zigpy_device):
@@ -133,6 +133,8 @@ class MainListener:
         if new and device.nwk != 0x0000 and len( device.get_signature()) > 0:   
             Domoticz.Log("Calling domoCreateDevice")
             device_signature = device.get_signature()
+            if 'device_type' in device_signature:
+                Domoticz.Log("Device Type: %s (%s)" %(device_signature['device_type'], type(device_signature['device_type'])))
             domoCreateDevice( self, device._ieee, device.get_signature() )
 
         for ep_id, endpoint in device.endpoints.items():
@@ -164,9 +166,9 @@ class MainListener:
     def attribute_updated(self, cluster, attribute_id, value):
         # Each object is linked to its parent (i.e. app > device > endpoint > cluster)
         device = cluster.endpoint.device
-        Domoticz.Debug("Device Signature: %s" %device.get_signature())
-        Domoticz.Debug("Received an attribute update %s=%s on cluster %s from device %s/%s" %( attribute_id, value, cluster, device, device._ieee) )
-        Domoticz.Debug("Cluster %04x Attribute: %s value: %s type(%s)" %(cluster.cluster_id, attribute_id, value, type(value)))
+        Domoticz.Log("Device Signature: %s" %device.get_signature())
+        Domoticz.Log("Received an attribute update %s=%s on cluster %s from device %s/%s" %( attribute_id, value, cluster, device, device._ieee) )
+        Domoticz.Log("Cluster %04x Attribute: %s value: %s type(%s)" %(cluster.cluster_id, attribute_id, value, type(value)))
         domoMajDevice( self, device._ieee, cluster.cluster_id, attribute_id, value )
 
 async def main( self ):
@@ -180,6 +182,8 @@ async def main( self ):
     except:
         Domoticz.Error( "Module zhaquirks not loaded")
 
+    sys.path.append('/usr/lib/python3.9/site-packages')
+    sys.path.append('/var/lib/domoticz/plugins/Domoticz-Zigpy/Zigpy-Libs') 
 
     Domoticz.Log("Entering in main ....")
     if self.domoticzParameters["Mode2"] in ( 'USB', 'DIN'):
@@ -324,7 +328,7 @@ def domoMajDevice( self, device_ieee, cluster, attribute_id, value ):
     Domoticz.Log("domoMajDevice - Device_ieee: %s cluster: %s attribute_id: %s value: %s" %(device_ieee, cluster, attribute_id, value))
     needed_widget_type = get_type_from_cluster( cluster )
 
-    Domoticz.Debug("---> Cluster to Widget: %s" %needed_widget_type)
+    Domoticz.Log("---> Cluster to Widget: %s" %needed_widget_type)
     if needed_widget_type is None:
         return
 
@@ -333,13 +337,13 @@ def domoMajDevice( self, device_ieee, cluster, attribute_id, value ):
             continue
 
         if needed_widget_type == 'Lux' and attribute_id == 0x0000:
-            Domoticz.Debug("Updating -----> Lux")
+            Domoticz.Log("Updating -----> Lux")
             nValue = int(value)
             sValue = str(nValue)
             UpdateDevice(self, unit, nValue, sValue )
 
         elif needed_widget_type == 'Motion' and attribute_id == 0x0000:
-            Domoticz.Debug("Updating-----> Motion")
+            Domoticz.Log("Updating-----> Motion")
             if bool(value):
                 nValue = 1
                 sValue = 'On'
@@ -370,7 +374,7 @@ def get_TypeName_from_device( self, unit):
     SwitchType = self.domoticzDevices[ unit ].SwitchType
 
     if ( Type, Subtype, SwitchType ) in MATRIX_TYPENAME:
-        Domoticz.Debug("(%s,%s,%s) matching with %s" %(Type, Subtype, SwitchType, MATRIX_TYPENAME[  ( Type, Subtype, SwitchType ) ]))
+        Domoticz.Log("(%s,%s,%s) matching with %s" %(Type, Subtype, SwitchType, MATRIX_TYPENAME[  ( Type, Subtype, SwitchType ) ]))
         return MATRIX_TYPENAME[  ( Type, Subtype, SwitchType ) ]
 
     return None
@@ -381,7 +385,7 @@ def device_list_units( self, device_ieee):
 
 def UpdateDevice(self, Unit, nValue, sValue ):
 
-    Domoticz.Debug("UpdateDevice - Unit: %s %s:%s" %(Unit, nValue, sValue))
+    Domoticz.Log("UpdateDevice - Unit: %s %s:%s" %(Unit, nValue, sValue))
 
     # Make sure that the Domoticz device still exists (they can be deleted) before updating it
     if Unit not in self.domoticzDevices:
@@ -408,13 +412,13 @@ def domoCreateDevice( self, device_ieee, device_signature):
 
     for ep in device_signature_endpoint:
         
-        Domoticz.Debug(" --> ep: %s" %ep)
+        Domoticz.Log(" --> ep: %s" %ep)
         in_cluster = device_signature_endpoint[ep]['input_clusters']
         out_cluster = device_signature_endpoint[ep]['output_clusters']
         for cluster in set(in_cluster+out_cluster):
-            Domoticz.Debug("----> Cluster: %s" %cluster)
+            Domoticz.Log("----> Cluster: %s" %cluster)
             widget_type = get_type_from_cluster( cluster )
-            Domoticz.Debug("---------> Widget Type: %s" %widget_type)
+            Domoticz.Log("---------> Widget Type: %s" %widget_type)
 
             if widget_type is None:
                 continue
@@ -424,11 +428,11 @@ def domoCreateDevice( self, device_ieee, device_signature):
                 createDomoticzWidget( self, device_ieee, ep, widget_type, Type_ = 244, Subtype_ = 73, Switchtype_ = 0 )
 
             elif widget_type == 'Lux':
-                Domoticz.Debug("----> Create Lux")
+                Domoticz.Log("----> Create Lux")
                 createDomoticzWidget( self, device_ieee, ep, widget_type, Type_ = 246, Subtype_ = 1, Switchtype_ = 0 )
                 
             elif widget_type == 'Motion':
-                Domoticz.Debug("----> Create Motion")
+                Domoticz.Log("----> Create Motion")
                 createDomoticzWidget( self, device_ieee, ep, widget_type, widgetType='Motion')
 
             elif widget_type == 'Temp':
@@ -444,16 +448,16 @@ def domoCreateDevice( self, device_ieee, device_signature):
                 createDomoticzWidget( self, device_ieee, ep, widget_type, Type_ = 244, Subtype_ = 73, Switchtype_ = 15 )
 
             elif widget_type == 'LvlControl':
-                createDomoticzWidget( self, Devices, NWKID, DeviceID_IEEE, Ep, t, Type_ = 244, Subtype_ = 73, Switchtype_ = 7 )
+                createDomoticzWidget( self, device_ieee, ep, widget_type, Type_ = 244, Subtype_ = 73, Switchtype_ = 7 )
  
 def createDomoticzWidget( self, ieee, ep, cType, widgetType = None,
                          Type_ = None, Subtype_ = None, Switchtype_ = None ): 
 
-    Domoticz.Debug("createDomoticzWidget")
+    Domoticz.Log("createDomoticzWidget")
     unit = getFreeUnit(self)
-    Domoticz.Debug("--> Unit: %s" %unit)
+    Domoticz.Log("--> Unit: %s" %unit)
     widgetName = '%s %s - %s' %(widgetType, ieee, ep )
-    Domoticz.Debug("--> widgetName: %s" %widgetName)
+    Domoticz.Log("--> widgetName: %s" %widgetName)
     if widgetType:
         Domoticz.Log("Creating device is Domoticz DeviceID:%s Name: %s Unit: %s TypeName: %s" %(ieee, widgetName, unit, widgetType))
         myDev = Domoticz.Device( DeviceID = str(ieee), Name = widgetName, Unit = unit, TypeName = widgetType )
@@ -477,21 +481,21 @@ def getFreeUnit(self, nbunit_=1):
     FreeUnit
     Look for a Free Unit number. If nbunit > 1 then we look for nbunit consecutive slots
     '''
-    Domoticz.Debug("getFreeUnit - Devices: %s" %len(self.domoticzDevices))
+    Domoticz.Log("getFreeUnit - Devices: %s" %len(self.domoticzDevices))
     return len(self.domoticzDevices) + 1
 
 def get_type_from_cluster( cluster ):
     # return a Widget Type list based on the available Cluster 
 
     TYPE_LIST = {
-        0x0006:'Switch',
-        0x0008:'LvlControl',
-        0x0102:'Shutter',
-        0x0400:'Lux',
-        0x0402:'Temp',
-        0x0403:'Baro',
-        0x0405:'Humi',
-        0x0406:'Motion'
+        0x0006: 'Switch',
+        0x0008: 'LvlControl',
+        0x0102: 'Venetian',
+        0x0400: 'Lux',
+        0x0402: 'Temp',
+        0x0403: 'Baro',
+        0x0405: 'Humi',
+        0x0406: 'Motion'
     }
     if cluster not in TYPE_LIST:
         return None
@@ -537,12 +541,12 @@ def onHeartbeat():
 def DumpConfigToLog():
     for x in Parameters:
         if Parameters[x] != "":
-            Domoticz.Debug( "'" + x + "':'" + str(Parameters[x]) + "'")
+            Domoticz.Log( "'" + x + "':'" + str(Parameters[x]) + "'")
     Domoticz.Log("Device count: " + str(len(Devices)))
     for x in Devices:
-        Domoticz.Debug("Device:           " + str(x) + " - " + str(Devices[x]))
-        Domoticz.Debug("Device ID:       '" + str(Devices[x].ID) + "'")
-        Domoticz.Debug("Device Name:     '" + Devices[x].Name + "'")
-        Domoticz.Debug("Device nValue:    " + str(Devices[x].nValue))
-        Domoticz.Debug("Device sValue:   '" + Devices[x].sValue + "'")
-        Domoticz.Debug("Device LastLevel: " + str(Devices[x].LastLevel))
+        Domoticz.Log("Device:           " + str(x) + " - " + str(Devices[x]))
+        Domoticz.Log("Device ID:       '" + str(Devices[x].ID) + "'")
+        Domoticz.Log("Device Name:     '" + Devices[x].Name + "'")
+        Domoticz.Log("Device nValue:    " + str(Devices[x].nValue))
+        Domoticz.Log("Device sValue:   '" + Devices[x].sValue + "'")
+        Domoticz.Log("Device LastLevel: " + str(Devices[x].LastLevel))
