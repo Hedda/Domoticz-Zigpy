@@ -1,0 +1,14 @@
+{
+  "domain": "Domoticz-Zigpy",
+  "name": "Zigbee plugin for Domoticz",
+  "documentation": "https://github.com/pipiche38/Domoticz-Zigpy",
+  "requirements": [
+    "pyusb",
+    "pyserial",
+    "pyserial-asyncio",
+    "zigpy",
+    "zha-quirks",
+    "zigpy-zigate"
+  ],
+  "codeowners": ["@pipiche38"]
+}
