@@ -17,11 +17,11 @@ The zigpy Github Organization is located at https://github.com/zigpy/. There are
 This project at this early stage is more a developers-only POC (Proof-Of-Concept) than anything else, as such users should not expect anything with it to work as of yet.
 
 
-## Current showstoppers
+## Current issues
 
 For now there are a number of show stoppers that need to be solved/sorted/fixed or have a more acceptable workaround before can move forward:
 
-   * Zigpy library and quirk are developped for Home Automation with no documentation on how to use. These are very focus on the HA design. Using Zigpy on Domoticz required a lot of work at that stage :
+   * Zigpy library and quirk are developped for __Home Automation__ with no documentation on how to use. These are very focus on the HA design. Using Zigpy on Domoticz required a lot of work at that stage :
       1. Understand how to use zigpy
       2. Understand what to do in order to have a correct setup (inside the plugin) to get all events from devices
       
@@ -29,13 +29,13 @@ For now there are a number of show stoppers that need to be solved/sorted/fixed 
       * Aqara Opple Switches not supported
       * Xiaomi Vibration making errors
       * Legrand devices not supported (they leave the network after a while)
+      * And even the manufacturer specific support do not take in consideration Binding and Configure Reporting 
    
    * The Zigate layer is not really mature and is at an early stage. That mean that we would not have such integration level with ZiGate as we have currently with the ZiGate plugin for Domoticz.
    
 
-Unfortunatly at that stage, I am probably not able to move forward:
-
 1. Required a lot of time to be spent in order to understand how the zigpy library .
+2. debuging seems complex due to the zigpy lib with the embdeed python framework. For instance standard python error are not reported with a stack trace and line numbers where to find the issue, nor the full error description!
 
 
 ## TO BE ADDRESSED
@@ -52,11 +52,6 @@ Unfortunatly at that stage, I am probably not able to move forward:
   * List of Endpoints
   * List of Cluster In and CLuster Out for each Endpoint
   
-  I found the information useful, but currently too restrictive in regards of a device. For instance if get_signature() could returned information like:
-    * Model Name (provided by Cluster 0x0000 Attribute 0x0005 )
-    * Manufacturer Code
-    * Manufacturer Name
-    * DeviceID (which is EndPoint based) and which can give information on the purpose of the device
     
 
 ## LIMITATIONS
@@ -67,6 +62,8 @@ Unfortunatly at that stage, I am probably not able to move forward:
   * Currently no access to the Certification CE or FCC
   * Currently no access to the TX Power / Energy level
   * Currently no access to ZiGate reset ( which is quiet convenient when hang). The reset allow to reboot the Zigbee stack of the zigate without any break.
+* the zha-quirks are Home Automation related and keep that in the naming as well as the packages delivered.
+* the current library seems not to take care of the Bind and Configure Reporting of the devices during the pairing process. In result it is up to the above layer to do so. The consequences are tha such above layer has to take care of all manufacturer specifics for the Binding and Reporting parts while the Quirk does also for mapping Cluster/Attribute to a more standard thing. End result will be to manage twice customer specific actions !
 
 
 ## Design Principle
