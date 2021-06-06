@@ -12,6 +12,13 @@ Define the DDS of the Domoticz-Zigpy plugin based on the current proof of concep
 * When the Domoticz plugin runs, it runs under 1 thread.
 * Domoticz calls which read/update the Domoticz sqlite database, can be locked, so in order to give the responsivness to the zigpy layer it is important to decouple the 2.
 
+## Open Topics
+
+1. How to send actions to Zigbee objects (cluster commands ) ?
+1. How to send actions/settings to Radio ( change channel, launch Lqi Management) ?
+1. Which layer is performing Cluster binding and set the Attribute Reporting ? ( Zigpy, Quirks , ... ) ?
+1. How to manage Logs/Debug ? ( dedicated thread ? )
+
 
 ### Threads
 
@@ -63,3 +70,4 @@ Define the DDS of the Domoticz-Zigpy plugin based on the current proof of concep
    
 1. Queue: forwarder
    Will receive messages from zigpy layer to be handled by domo device management.
+
