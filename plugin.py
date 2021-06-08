@@ -11,7 +11,7 @@
                     <ul style="list-style-type:square">
                         <li> ezsp: 	 Silicon Labs EmberZNet protocol (ex; Elelabs, HUSBZB-1, Telegesis). </li>
                         <li> deconz: dresden elektronik deCONZ protocol: ConBee I/II, RaspBee I/II. </li>
-                        <li> ti_cc:  Texas Instruments Z-Stack ZNP protocol (ex: CC253x, CC26x2, CC13x2). </li>
+                        <li> znp:  Texas Instruments Z-Stack ZNP protocol (ex: CC253x, CC26x2, CC13x2). </li>
                         <li> zigate: ZiGate Controller. You'll have to select between PiZiGate, ZiGate USB-TTL, ZiGate WiFi. </li>
                         <li> xbee: 	 Digi XBee ZB Coordinator Firmware protocol (Digi XBee Series 2, 2C, 3) </li>
                     </ul>
