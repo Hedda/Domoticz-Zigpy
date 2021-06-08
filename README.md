@@ -6,6 +6,8 @@ With the recent change done in Domoticz, the issue arround SQLITE3 is now solved
 
 [Domoticz-Zigpy](https://github.com/zigpy/zigpy) is an integration project which goal is to implement hardware independent Zigbee support in [Domoticz](https://www.domoticz.com/) open source home automation software using the [https://github.com/zigpy/zigpy/ zigpy] Python library.
 
+It is important to understand that zigpy is mainyly developped for Home Automation application, and in such I see a lot of push to get the application reproducing what HA is doing.
+
 Zigbee integration via zigpy this way would allow users to directly connect one of many off-the-shelf Zigbee adapters from different manufacturers using one of the available Zigbee radio library modules compatible with the zigpy API to control Zigbee based devices, without the need for a third-party gateway/hub/bridge that needs to be managed separately. This can enable the use of the same common interface no matter which Zigbee hardware adapter that users have. 
 
 The ultimate goal of zigpy (often also refered to as "zigpy library" or "zigpy project") is to be a free and open source software library that can interface with a Zigbee coordinator (sometimes referred to as a Zigbee controller) from any manufacturer and allow anyone who integrates zigpy to create applications to control devices on a Zigbee network, without requiring a very deep knowledge of the Zigbee specifications and manufacturer proprietary implementations.
