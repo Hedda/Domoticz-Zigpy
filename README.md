@@ -65,53 +65,14 @@ For now there are a number of show stoppers that need to be solved/sorted/fixed 
 * the zha-quirks are Home Automation related and keep that in the naming as well as the packages delivered.
 * the current library seems not to take care of the Bind and Configure Reporting of the devices during the pairing process. In result it is up to the above layer to do so. The consequences are tha such above layer has to take care of all manufacturer specifics for the Binding and Reporting parts while the Quirk does also for mapping Cluster/Attribute to a more standard thing. End result will be to manage twice customer specific actions !
 
+* The current implementation of zigpy / quirks leave to the application layer to do all of the binding and configure reporting, which then required to manage the manufacturer specific device cases (which is alreday done at the quirks level). https://github.com/zigpy/zigpy/discussions/752 This doesn't make sense to have the plugin doing all of this ( bindings + configure reporting).
 
 ## Design Principle
 
-As of the ZiGate plugin, Domoticz Widgets will be created based on the Zigbee device capabilities. Most likely the device signature from a Zigpy standpoint. Basically based on the Cluster list by device.
+https://github.com/pipiche38/Domoticz-Zigpy/blob/master/DDS.md
 
-In order to identify each device in Domoticz with a plugin uniq identifier, the IEEE will be used, this prevent any issues when the device changes its short address (NwkId).
 
-onMessage will not be use as zigpy will open the communication line with the HW.
 
-Keep the same principle as for the ZiGate plugin, no middle application in between. Makes the plugin fully autonomous and bridge Domoticz to the HW.
-
-Try to ease the integration of the Zigate plugin . There are quiet a large developement done like Schneider (where we simulate more-less the HUB) , and it would benefit to the new plugin. In such it might be helpfull to keep a number of API common between the 2 plugins !
-
-Two-steps approach could be taken:
-1. Building a kind of layer between the zigpy and the existing zigate plugin in order to speedup and reuse the existing code and make the integration at a similar level of the current Zigate plugin with the admin interface.
-   * It will anyway remove some of the existing code, as the quirk will provide "native" what is currently embedded in the zigate plugin code.
-   * On the otherside, need to see how to faster the existing Device integration and get quirks for them ( Legrand is an important one, Livolo ....)
-2. Refactor the code to use the zigpy power.
-
-### Threads (to be clarified)
-
-1. The PythonPluginThread (main thread).
-2. One thread will be dedicated to the Zigbee layer and will manage the all zigpy part
-3. One thread will manage the Domoticz layer ( Widget creation and all updates required by inbound communition from Zigbee )
-4. A communication scheme (Queue) will be put in place to ensure communication between the three threads:
-   * zigpy thread <-> domoticz thread
-   * main thread <-> zigpy thread
-
-Will most-likely required a Web-Admin page in order to:
-
-* Configure the plugin
-* Configure the port (baud rate, serial-port or socket and port for IP gateways like ZiGate WiFi)
-* Configure the HW ( channel, Extended PANId, TX Power, LED .... )
-* Manage Groups
-* Manage Bindings
-* Display device mapping
-* ...
-
-### To be considered
-
-1. How to configure the Zigpy hardware layer to be used? Basically from my current understand you need to import a specific "zigpy-**[zigbee hardware]**" radio library as a module to interface with the corresponding hardware. Some of those radio libraries will have enabled some features while some others have not. How to handle that (independently) for each radio library and hardware?
-
-2. How to handle device update. From my current undestanding we get async call, and if we use them straigh to update the Domoticz Database, we might have some reentrance issues. Most-likely a lock mecanism needs to be in place to protect the Domoticz Database update (at least at the python framework level).
-
-3. How to handle Device provisioning? End-to-End.
-
-4. Would it be possible to migrate Zigate users from Domoticz-Zigate plugin to Domoticz-Zigpy plugin? From a pure HW perspective the ZiGate firmware does not really care of who is using it. From a plugin standpoinit it might be interested to see if we could populate the Zigpy database from the ZiGate plugin or vice versa?
 
 
 ## Details on the Zigpy project
